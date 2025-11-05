@@ -162,33 +162,51 @@ const useForm = () => {
     setFieldsValue(values);
   }
 
-  // 过滤掉 void 类型容器的数据层级（将子字段提升到父级）
+  // 过滤掉布局容器的数据层级（将子字段提升到父级）
   const filterVoidContainers = (values: any, flatten: any) => {
-    const voidPaths = Object.keys(flatten).filter(key => {
+    // 布局容器 widget 列表（这些 widget 只用于布局，不应该产生数据嵌套）
+    const layoutWidgets = [
+      'collapse',
+      'boxCollapse',
+      'card',
+      'boxcard',
+      'boxLineTitle',
+      'boxSubInline',
+      'lineTitle',
+      'subInline',
+      'box',
+      'group',
+      'fieldset'
+    ];
+
+    // 找出所有布局容器字段（type 为 void 或 widget 是布局组件）
+    const containerPaths = Object.keys(flatten).filter(key => {
       const schema = flatten[key]?.schema;
-      return schema?.type === 'void' && !schema?.bind;
+      const isVoidType = schema?.type === 'void' && !schema?.bind;
+      const isLayoutWidget = schema?.widget && layoutWidgets.includes(schema.widget);
+      return isVoidType || isLayoutWidget;
     });
 
-    if (voidPaths.length === 0) {
+    if (containerPaths.length === 0) {
       return values;
     }
 
     const result = cloneDeep(values);
 
     // 按路径深度排序，从深到浅处理
-    voidPaths.sort((a, b) => {
+    containerPaths.sort((a, b) => {
       const depthA = (a.match(/\./g) || []).length;
       const depthB = (b.match(/\./g) || []).length;
       return depthB - depthA;
     });
 
-    voidPaths.forEach(voidPath => {
+    containerPaths.forEach(containerPath => {
       // 移除 [] 标记和开头的 #
-      const cleanPath = voidPath.replace(/\[\]/g, '').replace(/^#\.?/, '');
+      const cleanPath = containerPath.replace(/\[\]/g, '').replace(/^#\.?/, '');
       if (!cleanPath) return;
 
       const pathParts = cleanPath.split('.');
-      const voidKey = pathParts[pathParts.length - 1];
+      const containerKey = pathParts[pathParts.length - 1];
       const parentPath = pathParts.slice(0, -1);
 
       // 获取父级对象
@@ -198,15 +216,15 @@ const useForm = () => {
         parent = parent[part];
       }
 
-      // 如果 void 容器存在且有值
-      if (parent[voidKey] && isObject(parent[voidKey])) {
-        const voidContainer = parent[voidKey];
-        // 将 void 容器的子字段提升到父级
-        Object.keys(voidContainer).forEach(childKey => {
-          parent[childKey] = voidContainer[childKey];
+      // 如果布局容器存在且有值
+      if (parent[containerKey] && isObject(parent[containerKey])) {
+        const container = parent[containerKey];
+        // 将布局容器的子字段提升到父级
+        Object.keys(container).forEach(childKey => {
+          parent[childKey] = container[childKey];
         });
-        // 删除 void 容器本身
-        delete parent[voidKey];
+        // 删除布局容器本身
+        delete parent[containerKey];
       }
     });
 

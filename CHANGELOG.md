@@ -1,18 +1,24 @@
 # 更新日志
 
-### 1.0.1 (2025-11-05)
+### 1.0.2 (2025-11-05)
 
 #### ✨ 新增功能
 
 **全局扁平化配置 `flattenData`**
 - 新增 `flattenData` 配置项，一键启用全局数据扁平化
-- 启用后，`getValues()`、`watch`、`onFinish` 等所有数据都会自动移除 void 容器层级
+- 启用后，`getValues()`、`watch`、`onFinish` 等所有数据都会自动移除布局容器层级
 - 无需手动调用 `getFlatValues()`，简化开发流程
+- **智能识别布局容器**：根据 `widget` 类型自动识别，无需修改 schema 的 `type`
 
-#### 🐛 问题修复
+#### 🔧 优化改进
+
+**自动识别布局容器 widget**
+- 支持根据 `widget` 类型自动识别布局容器，无需强制要求 `type: 'void'`
+- 支持的布局 widget：`collapse`、`boxCollapse`、`card`、`boxcard`、`boxLineTitle`、`boxSubInline` 等
+- 大幅降低使用成本，不需要修改现有 schema
 
 **watch 智能路径匹配**
-- 修复 `watch` 监听时的路径问题，支持自动匹配 void 容器（如 collapse、card 等布局容器）内的字段
+- 修复 `watch` 监听时的路径问题，支持自动匹配布局容器内的字段
 - 现在可以直接使用字段名监听，无需包含布局容器的路径
 - **完全向后兼容**：原有的完整路径写法依然有效
 

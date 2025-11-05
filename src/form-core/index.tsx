@@ -167,14 +167,87 @@ const FormCore:FC<FRProps> = (props) => {
     valuesWatch(changedValues, allValues, watch, flattenSchema, flattenData);
   };
 
+  // 扁平化 values（移除布局容器层级）
+  const filterVoidContainers = (values: any) => {
+    if (!flattenSchema || !values) {
+      return values;
+    }
+
+    // 布局容器 widget 列表（这些 widget 只用于布局，不应该产生数据嵌套）
+    const layoutWidgets = [
+      'collapse',
+      'boxCollapse',
+      'card',
+      'boxcard',
+      'boxLineTitle',
+      'boxSubInline',
+      'lineTitle',
+      'subInline',
+      'box',
+      'group',
+      'fieldset'
+    ];
+
+    // 找出所有布局容器字段（type 为 void 或 widget 是布局组件）
+    const containerPaths = Object.keys(flattenSchema).filter(key => {
+      const schema = flattenSchema[key]?.schema;
+      const isVoidType = schema?.type === 'void' && !schema?.bind;
+      const isLayoutWidget = schema?.widget && layoutWidgets.includes(schema.widget);
+      return isVoidType || isLayoutWidget;
+    });
+
+    if (containerPaths.length === 0) {
+      return values;
+    }
+
+    const result = cloneDeep(values);
+
+    // 按路径深度排序，从深到浅处理
+    containerPaths.sort((a, b) => {
+      const depthA = (a.match(/\./g) || []).length;
+      const depthB = (b.match(/\./g) || []).length;
+      return depthB - depthA;
+    });
+
+    containerPaths.forEach(containerPath => {
+      // 移除 [] 标记和开头的 #
+      const cleanPath = containerPath.replace(/\[\]/g, '').replace(/^#\.?/, '');
+      if (!cleanPath) return;
+
+      const pathParts = cleanPath.split('.');
+      const containerKey = pathParts[pathParts.length - 1];
+      const parentPath = pathParts.slice(0, -1);
+
+      // 获取父级对象
+      let parent = result;
+      for (const part of parentPath) {
+        if (!parent[part]) return;
+        parent = parent[part];
+      }
+
+      // 如果布局容器存在且有值
+      if (parent[containerKey] && typeof parent[containerKey] === 'object' && !Array.isArray(parent[containerKey])) {
+        const container = parent[containerKey];
+        // 将布局容器的子字段提升到父级
+        Object.keys(container).forEach(childKey => {
+          parent[childKey] = container[childKey];
+        });
+        // 删除布局容器本身
+        delete parent[containerKey];
+      }
+    });
+
+    return result;
+  };
+
   const transFormValues = (_values: any) => {
     let values = cloneDeep(_values);
     values = removeHiddenData ? filterValuesHidden(values, flattenSchema) : cloneDeep(form.getFieldsValue(true));
     values = parseValuesToBind(values, flattenSchema);
     values = filterValuesUndefined(values);
-    // 如果启用了 flattenData，自动扁平化数据
+    // 如果启用了 flattenData，扁平化数据
     if (flattenData) {
-      values = form.getFlatValues();
+      values = filterVoidContainers(values);
     }
     return values;
   };
