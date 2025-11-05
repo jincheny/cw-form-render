@@ -1,43 +1,63 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Build output
-lib/
-es/
-dist/
-build/
+# dependencies
+/node_modules
+/npm-debug.log*
+/yarn-error.log
+/yarn.lock
+/package-lock.json
 
-# Testing
-coverage/
-.nyc_output/
+*/*/yarn-error.log
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+.yarn
+.turbo/cookies
+.turbo/daemon
+.turbo
+
+# turbo
+*/*/.turbo
+
+
+# production
+/dist
+/lib
+/docs-dist
+# misc
+.idea
 .DS_Store
+.idea
+.vscode
 
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-pnpm-debug.log*
-
-# Env files
-.env
+# umi
+.dumi/tmp
+.dumi-production
+.dumi-test
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
-# Misc
-.cache/
-*.tsbuildinfo
+# lerna
+node_modules
 
+/.local
+
+/es
+/*/es
+/*/lib
+/*/.local
+/*/dist
+
+/widgets/*/es
+/widgets/*/lib
+/widgets/*/.local
+/widgets/*/dist
+
+/tools/*/es
+/tools/*/lib
+/tools/*/.local
+/tools/*/dist
+
+# custom
+old-doc
+test.json
+/docs/guide/.test
+
+/coverage

@@ -162,6 +162,57 @@ const useForm = () => {
     setFieldsValue(values);
   }
 
+  // 过滤掉 void 类型容器的数据层级（将子字段提升到父级）
+  const filterVoidContainers = (values: any, flatten: any) => {
+    const voidPaths = Object.keys(flatten).filter(key => {
+      const schema = flatten[key]?.schema;
+      return schema?.type === 'void' && !schema?.bind;
+    });
+
+    if (voidPaths.length === 0) {
+      return values;
+    }
+
+    const result = cloneDeep(values);
+
+    // 按路径深度排序，从深到浅处理
+    voidPaths.sort((a, b) => {
+      const depthA = (a.match(/\./g) || []).length;
+      const depthB = (b.match(/\./g) || []).length;
+      return depthB - depthA;
+    });
+
+    voidPaths.forEach(voidPath => {
+      // 移除 [] 标记和开头的 #
+      const cleanPath = voidPath.replace(/\[\]/g, '').replace(/^#\.?/, '');
+      if (!cleanPath) return;
+
+      const pathParts = cleanPath.split('.');
+      const voidKey = pathParts[pathParts.length - 1];
+      const parentPath = pathParts.slice(0, -1);
+
+      // 获取父级对象
+      let parent = result;
+      for (const part of parentPath) {
+        if (!parent[part]) return;
+        parent = parent[part];
+      }
+
+      // 如果 void 容器存在且有值
+      if (parent[voidKey] && isObject(parent[voidKey])) {
+        const voidContainer = parent[voidKey];
+        // 将 void 容器的子字段提升到父级
+        Object.keys(voidContainer).forEach(childKey => {
+          parent[childKey] = voidContainer[childKey];
+        });
+        // 删除 void 容器本身
+        delete parent[voidKey];
+      }
+    });
+
+    return result;
+  };
+
   // 获取表单数据
   xform.getValues = (nameList?: any, filterFunc?: any, notFilterUndefined?:boolean,notFilterHideData:boolean=true) => {
     let values = cloneDeep(form.getFieldsValue(getFieldName(nameList), filterFunc));
@@ -175,10 +226,45 @@ const useForm = () => {
     return parseValuesToBind(values, flattenSchemaRef.current);
   }
 
+  // 获取扁平化的表单数据（自动移除 void 类型容器的层级，如 collapse、group 等布局容器）
+  xform.getFlatValues = (nameList?: any, filterFunc?: any, notFilterUndefined?:boolean) => {
+    let values = cloneDeep(form.getFieldsValue(getFieldName(nameList), filterFunc));
+    const { removeHiddenData } = storeRef.current?.getState() || {};
+    if (removeHiddenData) {
+      values = filterValuesHidden(values, flattenSchemaRef.current);
+    }
+    if (!notFilterUndefined) {
+      values = filterValuesUndefined(values);
+    }
+    values = parseValuesToBind(values, flattenSchemaRef.current);
+    // 移除 void 类型容器的数据层级
+    values = filterVoidContainers(values, flattenSchemaRef.current);
+    return values;
+  }
+
   xform.getValueByPath = (path: string) => {
     const name = getFieldName(path);
     return form.getFieldValue(name);
   }
+
+  // 通过字段名获取值（从 flattenSchema 中查找对应路径）
+  xform.getValueByName = (name: string) => {
+    if (typeof name !== 'string') {
+      console.warn('请输入正确的字段名');
+      return;
+    }
+    const flattenItem = flattenSchemaRef.current?.[name];
+    if (!flattenItem) {
+      console.warn(`未找到字段名为 ${name} 的 schema`);
+      return;
+    }
+    // 将 name 转换为路径，去掉 []
+    const path = name === '#' ? '' : name.replace(/\[\]/g, '');
+    if (!path) {
+      return form.getFieldsValue();
+    }
+    return xform.getValueByPath(path);
+  };
 
   // 设置某个字段的值
   xform.setValueByPath = (path: string, value: any) => {
@@ -201,6 +287,26 @@ const useForm = () => {
     }
   }
 
+  // 通过字段名设置值（从 flattenSchema 中查找对应路径）
+  xform.setValueByName = (name: string, value: any) => {
+    if (typeof name !== 'string') {
+      console.warn('请输入正确的字段名');
+      return;
+    }
+    const flattenItem = flattenSchemaRef.current?.[name];
+    if (!flattenItem) {
+      console.warn(`未找到字段名为 ${name} 的 schema`);
+      return;
+    }
+    // 将 name 转换为路径，去掉 []
+    const path = name === '#' ? '' : name.replace(/\[\]/g, '');
+    if (!path) {
+      console.warn('根节点不支持通过 setValueByName 修改');
+      return;
+    }
+    xform.setValueByPath(path, value);
+  };
+
   // 通过某个字段的 schema
   xform.getSchemaByPath = (_path: string) => {
     if (typeof _path !== 'string') {
@@ -208,6 +314,40 @@ const useForm = () => {
     }
     const path = getSchemaFullPath(_path, schemaRef.current);
     return _get(schemaRef.current, path);
+  };
+
+  // 通过字段名获取 schema（从 flattenSchema 中查找）
+  xform.getSchemaByName = (name: string) => {
+    if (typeof name !== 'string') {
+      console.warn('请输入正确的字段名');
+      return;
+    }
+    const flattenItem = flattenSchemaRef.current?.[name];
+    if (!flattenItem) {
+      console.warn(`未找到字段名为 ${name} 的 schema`);
+      return;
+    }
+    return flattenItem.schema;
+  };
+
+  // 通过字段名设置 schema（从 flattenSchema 中查找对应路径）
+  xform.setSchemaByName = (name: string, _newSchema: any) => {
+    if (typeof name !== 'string') {
+      console.warn('请输入正确的字段名');
+      return;
+    }
+    const flattenItem = flattenSchemaRef.current?.[name];
+    if (!flattenItem) {
+      console.warn(`未找到字段名为 ${name} 的 schema`);
+      return;
+    }
+    // 将 name 转换为路径，去掉开头的 # 和 []
+    const path = name === '#' ? '' : name.replace(/\[\]/g, '');
+    if (!path) {
+      console.warn('根节点不支持通过 setSchemaByName 修改');
+      return;
+    }
+    xform.setSchemaByPath(path, _newSchema);
   };
 
   // 获取协议

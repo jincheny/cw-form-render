@@ -174,7 +174,7 @@ export interface FormInstance {
    */
   getSchema: () => any;
   /**
-   * 
+   *
    * 获取 flatten schema
    */
   getFlattenSchema: (path?: string) => any;
@@ -182,6 +182,14 @@ export interface FormInstance {
    * 根据路径获取 Schema
    */
   getSchemaByPath: (path: string) => any;
+  /**
+   * 根据字段名获取 Schema（从 flattenSchema 中查找）
+   */
+  getSchemaByName: (name: string) => any;
+  /**
+   * 根据字段名动态设置 Schema（从 flattenSchema 中查找对应路径）
+   */
+  setSchemaByName: (name: string, schema: any) => any;
   /**
    * 外部手动修改 errorFields 校验信息
    */
@@ -214,18 +222,30 @@ export interface FormInstance {
    * 检查某个表单项是否在校验中
    */
   isFieldValidating: AntdFormInstance['isFieldValidating'];
-    /**
+  /**
    * 根据路径获取表单值
    */
   getValueByPath: AntdFormInstance['getFieldValue'];
+  /**
+   * 根据字段名获取表单值（从 flattenSchema 中查找对应路径）
+   */
+  getValueByName: (name: string) => any;
   /**
    * 根据路径修改表单值
    */
   setValueByPath: AntdFormInstance['setFieldValue'];
   /**
+   * 根据字段名修改表单值（从 flattenSchema 中查找对应路径）
+   */
+  setValueByName: (name: string, value: any) => void;
+  /**
    * 获取表单值
    */
   getValues: AntdFormInstance['getFieldsValue'];
+  /**
+   * 获取扁平化的表单值（自动移除 void 类型容器的层级，如 collapse、group 等布局容器）
+   */
+  getFlatValues: (nameList?: any, filterFunc?: any, notFilterUndefined?: boolean) => any;
   /**
    * 设置表单值
    */
