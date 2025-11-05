@@ -78,24 +78,156 @@ const traverseValues = ({ changedValues, allValues, flatValues }) => {
   traverseObj(changedValues, allValues, null, []);
 };
 
-export const valuesWatch = (changedValues: any, allValues: any, watch: any) => {
+// 移除路径中的 void 容器部分
+const removeFlattenVoidContainers = (path: string, flattenSchema: any) => {
+  if (!flattenSchema || !path) {
+    return [];
+  }
+
+  const voidContainers: string[] = [];
+
+  // 找出所有 void 类型的容器
+  Object.keys(flattenSchema).forEach(key => {
+    const schema = flattenSchema[key]?.schema;
+    if (schema?.type === 'void' && !schema?.bind) {
+      const cleanPath = key.replace(/\[\]/g, '').replace(/^#\.?/, '');
+      if (cleanPath) {
+        voidContainers.push(cleanPath);
+      }
+    }
+  });
+
+  // 按路径长度排序，从长到短（先处理深层的）
+  voidContainers.sort((a, b) => b.length - a.length);
+
+  // 生成可能的路径变体
+  const pathVariants = [path];
+
+  voidContainers.forEach(voidPath => {
+    const newVariants: string[] = [];
+    pathVariants.forEach(variant => {
+      // 如果路径中包含这个 void 容器，生成移除它后的版本
+      if (variant.includes(voidPath + '.')) {
+        newVariants.push(variant.replace(voidPath + '.', ''));
+      } else if (variant === voidPath) {
+        // 如果完全匹配 void 路径，则跳过
+        return;
+      }
+    });
+    pathVariants.push(...newVariants);
+  });
+
+  return [...new Set(pathVariants)]; // 去重
+};
+
+// 扁平化 values（移除 void 容器层级）
+const flattenValues = (values: any, flattenSchema: any) => {
+  if (!flattenSchema || !values) {
+    return values;
+  }
+
+  const voidPaths = Object.keys(flattenSchema).filter(key => {
+    const schema = flattenSchema[key]?.schema;
+    return schema?.type === 'void' && !schema?.bind;
+  });
+
+  if (voidPaths.length === 0) {
+    return values;
+  }
+
+  const result = JSON.parse(JSON.stringify(values)); // 深拷贝
+
+  // 按路径深度排序，从深到浅处理
+  voidPaths.sort((a, b) => {
+    const depthA = (a.match(/\./g) || []).length;
+    const depthB = (b.match(/\./g) || []).length;
+    return depthB - depthA;
+  });
+
+  voidPaths.forEach(voidPath => {
+    // 移除 [] 标记和开头的 #
+    const cleanPath = voidPath.replace(/\[\]/g, '').replace(/^#\.?/, '');
+    if (!cleanPath) return;
+
+    const pathParts = cleanPath.split('.');
+    const voidKey = pathParts[pathParts.length - 1];
+    const parentPath = pathParts.slice(0, -1);
+
+    // 获取父级对象
+    let parent = result;
+    for (const part of parentPath) {
+      if (!parent[part]) return;
+      parent = parent[part];
+    }
+
+    // 如果 void 容器存在且有值
+    if (parent[voidKey] && typeof parent[voidKey] === 'object' && !Array.isArray(parent[voidKey])) {
+      const voidContainer = parent[voidKey];
+      // 将 void 容器的子字段提升到父级
+      Object.keys(voidContainer).forEach(childKey => {
+        parent[childKey] = voidContainer[childKey];
+      });
+      // 删除 void 容器本身
+      delete parent[voidKey];
+    }
+  });
+
+  return result;
+};
+
+export const valuesWatch = (changedValues: any, allValues: any, watch: any, flattenSchema?: any, shouldFlatten?: boolean) => {
   if (Object.keys(watch || {})?.length === 0) {
     return;
   }
 
+  // 如果启用了全局扁平化，扁平化数据
+  let processedChangedValues = changedValues;
+  let processedAllValues = allValues;
+
+  if (shouldFlatten && flattenSchema) {
+    processedChangedValues = flattenValues(changedValues, flattenSchema);
+    processedAllValues = flattenValues(allValues, flattenSchema);
+  }
+
   const flatValues = {
-    '#': { value: allValues, index: changedValues }
+    '#': { value: processedAllValues, index: processedChangedValues }
   };
 
-  traverseValues({ changedValues, allValues, flatValues });
+  traverseValues({ changedValues: processedChangedValues, allValues: processedAllValues, flatValues });
 
-  Object.keys(watch).forEach(path => {
-    if (!_has(flatValues, path)) {
-      return;
+  Object.keys(watch).forEach(watchPath => {
+    const item = watch[watchPath];
+
+    // 如果没有启用全局扁平化，使用智能路径匹配
+    if (!shouldFlatten && flattenSchema) {
+      // 生成该 watch 路径的所有可能变体（原始路径 + 扁平化后的路径）
+      const pathVariants = removeFlattenVoidContainers(watchPath, flattenSchema);
+
+      // 尝试匹配任意一个路径变体
+      for (const path of pathVariants) {
+        if (_has(flatValues, path)) {
+          const { value, index } = _get(flatValues, path) as { value: any; index: any; };
+          executeCallBack(item, value, watchPath, index);
+          return;
+        }
+      }
+
+      // 兼容处理：如果 watchPath 没有 void 容器，但 flatValues 中的路径包含 void 容器
+      // 则尝试匹配包含 void 容器的完整路径
+      Object.keys(flatValues).forEach(flatPath => {
+        const variants = removeFlattenVoidContainers(flatPath, flattenSchema);
+        if (variants.includes(watchPath)) {
+          const { value, index } = _get(flatValues, flatPath) as { value: any; index: any; };
+          executeCallBack(item, value, watchPath, index);
+        }
+      });
+    } else {
+      // 启用了全局扁平化或没有 flattenSchema，直接匹配
+      if (_has(flatValues, watchPath)) {
+        const { value, index } = _get(flatValues, watchPath) as { value: any; index: any; };
+        executeCallBack(item, value, watchPath, index);
+      }
     }
-    const { value, index } = _get(flatValues, path) as { value: any; index: any; };
-    const item = watch[path];
-    executeCallBack(item, value, path, index)
   });
 };
 
@@ -112,7 +244,7 @@ export const transformFieldsData = (_fieldsError: any, getFieldName: any) => {
   return fieldsError.map((field: any) => ({ errors: field.error, ...field, name: getFieldName(field.name) }));
 };
 
-export const immediateWatch = (watch: any, values: any) => {
+export const immediateWatch = (watch: any, values: any, flattenSchema?: any, shouldFlatten?: boolean) => {
   if (Object.keys(watch || {})?.length === 0) {
     return;
   }
@@ -125,7 +257,7 @@ export const immediateWatch = (watch: any, values: any) => {
     }
   });
 
-  valuesWatch(values, values, watchObj);
+  valuesWatch(values, values, watchObj, flattenSchema, shouldFlatten);
 };
 
 export const getSchemaFullPath = (path: string, schema: any) => {

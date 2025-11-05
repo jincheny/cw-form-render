@@ -275,35 +275,75 @@ const schema = {
 };
 ```
 
-## 🆕 v1.0.0 新功能
+## 🆕 最新更新
 
-### 通过字段名直接操作
+### v1.0.1 - 全局扁平化配置
 
-原本需要使用完整路径：
+新增 `flattenData` 配置，一键启用全局数据扁平化，让表单数据处理更简单！
 
 ```typescript
-// 旧方式
+// ✅ 启用全局扁平化
+<FormRender
+  form={form}
+  schema={schema}
+  flattenData={true}  // 🔥 一键搞定！
+  watch={{
+    '#': (allValues, changedValues) => {
+      // 数据已自动扁平化，直接访问字段
+      const { license_key, state_dict } = changedValues;
+      // 不再需要: changedValues.SoftwareLicense.license_key
+    }
+  }}
+  onFinish={(values) => {
+    // 提交的数据也是扁平的
+    console.log(values); 
+    // => { license_key: 'xxx', state_dict: {...} }
+  }}
+/>
+```
+
+**优势：**
+- ✅ 一次配置，全局生效
+- ✅ `getValues()`、`watch`、`onFinish` 等所有数据都自动扁平化
+- ✅ 无需关心 void 容器嵌套
+- ✅ 代码更简洁清晰
+
+**智能路径匹配：**
+同时支持字段名监听，向后兼容完整路径写法。
+
+```typescript
+watch = {
+  // ✅ 简化写法（推荐）
+  'license_key': (value) => console.log(value),
+  
+  // ✅ 完整路径（兼容）
+  'SoftwareLicense.license_key': (value) => console.log(value)
+}
+```
+
+### v1.0.0 - 简化的 API 和扁平化数据
+
+#### 1. 通过字段名直接操作
+
+```typescript
+// ✅ 新方式 - 直接使用字段名
+form.setSchemaByName('userName', { hidden: true });
+form.getSchemaByName('userName');
+form.setValueByName('userName', '张三');
+form.getValueByName('userName');
+
+// ❌ 旧方式 - 需要完整路径
 form.setSchemaByPath('basicInfo.userName', { hidden: true });
 ```
 
-现在可以直接使用字段名：
+#### 2. 扁平化数据获取
 
 ```typescript
-// 新方式 - 更简单！
-form.setSchemaByName('userName', { hidden: true });
-```
-
-### 扁平化数据获取
-
-解决布局容器带来的不必要嵌套问题：
-
-```typescript
-// Schema 结构
+// Schema 包含 void 布局容器
 {
-  type: 'object',
   properties: {
     basicInfo: {
-      type: 'void',  // 布局容器
+      type: 'void',
       widget: 'collapse',
       properties: {
         userName: { type: 'string' },
@@ -313,11 +353,11 @@ form.setSchemaByName('userName', { hidden: true });
   }
 }
 
-// 使用 getValues() - 包含容器层级
+// getValues() - 包含容器层级
 form.getValues() 
 // => { basicInfo: { userName: '张三', age: 25 } }
 
-// 使用 getFlatValues() - 自动扁平化
+// getFlatValues() - 自动扁平化
 form.getFlatValues()
 // => { userName: '张三', age: 25 }
 ```

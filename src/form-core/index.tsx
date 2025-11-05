@@ -53,6 +53,7 @@ const FormCore:FC<FRProps> = (props) => {
     disabled,
     footer,
     removeHiddenData,
+    flattenData,
     operateExtra,
     logOnMount,
     logOnSubmit,
@@ -73,8 +74,8 @@ const FormCore:FC<FRProps> = (props) => {
   }, [JSON.stringify(props.schema || {})]);
 
   useEffect(() => {
-    store.setState({ removeHiddenData });
-  }, [removeHiddenData]);
+    store.setState({ removeHiddenData, flattenData });
+  }, [removeHiddenData, flattenData]);
 
   useEffect(() => {
     const context = {
@@ -96,7 +97,7 @@ const FormCore:FC<FRProps> = (props) => {
     onMountLogger();
     setTimeout(() => {
       const values = form.getValues();
-      immediateWatch(watch, values);
+      immediateWatch(watch, values, flattenSchema, flattenData);
     }, 0);
   };
 
@@ -129,7 +130,7 @@ const FormCore:FC<FRProps> = (props) => {
     if (!isFunction(logOnSubmit)) {
       return;
     }
-   
+
     const start = getSessionItem('FORM_START');
     const mount = getSessionItem('FORM_MOUNT_TIME');
 
@@ -162,7 +163,8 @@ const FormCore:FC<FRProps> = (props) => {
 
   const handleValuesChange = (changedValues: any, _allValues: any) => {
     const allValues = filterValuesUndefined(_allValues, true);
-    valuesWatch(changedValues, allValues, watch);
+    // 传递 flattenSchema 和 flattenData 配置给 valuesWatch
+    valuesWatch(changedValues, allValues, watch, flattenSchema, flattenData);
   };
 
   const transFormValues = (_values: any) => {
@@ -170,6 +172,10 @@ const FormCore:FC<FRProps> = (props) => {
     values = removeHiddenData ? filterValuesHidden(values, flattenSchema) : cloneDeep(form.getFieldsValue(true));
     values = parseValuesToBind(values, flattenSchema);
     values = filterValuesUndefined(values);
+    // 如果启用了 flattenData，自动扁平化数据
+    if (flattenData) {
+      values = form.getFlatValues();
+    }
     return values;
   };
 
@@ -211,7 +217,7 @@ const FormCore:FC<FRProps> = (props) => {
       </Button>
     );
   }
-  
+
   return (
     <Form
       className={classNames('fr-form', { [className]: !!className } )}

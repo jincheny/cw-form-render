@@ -216,14 +216,19 @@ const useForm = () => {
   // 获取表单数据
   xform.getValues = (nameList?: any, filterFunc?: any, notFilterUndefined?:boolean,notFilterHideData:boolean=true) => {
     let values = cloneDeep(form.getFieldsValue(getFieldName(nameList), filterFunc));
-    const { removeHiddenData } = storeRef.current?.getState() || {};
+    const { removeHiddenData, flattenData } = storeRef.current?.getState() || {};
     if (notFilterHideData && removeHiddenData) {
       values = filterValuesHidden(values, flattenSchemaRef.current);
     }
     if (!notFilterUndefined) {
       values = filterValuesUndefined(values);
     }
-    return parseValuesToBind(values, flattenSchemaRef.current);
+    values = parseValuesToBind(values, flattenSchemaRef.current);
+    // 如果启用了全局扁平化，自动移除 void 容器层级
+    if (flattenData) {
+      values = filterVoidContainers(values, flattenSchemaRef.current);
+    }
+    return values;
   }
 
   // 获取扁平化的表单数据（自动移除 void 类型容器的层级，如 collapse、group 等布局容器）
