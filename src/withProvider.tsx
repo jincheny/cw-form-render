@@ -4,9 +4,13 @@ import dayjs from 'dayjs';
 import { useUnmount } from 'ahooks';
 
 import zhCN from 'antd/lib/locale/zh_CN';
+import zhTW from 'antd/lib/locale/zh_TW';
 import enUS from 'antd/lib/locale/en_US';
+import jaJP from 'antd/lib/locale/ja_JP';
 import locales from './locales';
 import 'dayjs/locale/zh-cn';
+import 'dayjs/locale/zh-tw';
+import 'dayjs/locale/ja';
 
 import { createStore } from './models/store';
 import { FRContext, ConfigContext } from './models/context';
@@ -25,29 +29,37 @@ export default function withProvider<T>(Element: React.ComponentType<T>, default
       globalConfig = {},
       ...otherProps
     } = props;
-  
+
     const storeRef = useRef(createStore());
     const store: any = storeRef.current;
-  
+
     useEffect(() => {
-      if (locale === 'en-US') {
-        dayjs.locale('en');
-        return;
-      }
-      dayjs.locale('zh-cn');
+      const dayjsLocaleMap: Record<string, string> = {
+        'en-US': 'en',
+        'ja-JP': 'ja',
+        'zh-CN': 'zh-cn',
+        'zh-TW': 'zh-tw',
+      };
+      dayjs.locale(dayjsLocaleMap[locale] || 'zh-cn');
     }, [locale]);
 
     useUnmount(() => {
       form.resetFields();
     });
-  
+
     if (!form) {
       console.warn('Please provide a form instance to FormRender');
       return null;
     }
-  
-    const antdLocale = locale === 'zh-CN' ? zhCN : enUS;
-    const formValidateMessages = locale === 'zh-CN' ? validateMessagesCN : validateMessagesEN;
+
+    const antdLocaleMap: Record<string, any> = {
+      'zh-CN': zhCN,
+      'zh-TW': zhTW,
+      'en-US': enUS,
+      'ja-JP': jaJP,
+    };
+    const antdLocale = antdLocaleMap[locale] || zhCN;
+    const formValidateMessages = locale === 'en-US' || locale === 'ja-JP' ? validateMessagesEN : validateMessagesCN;
     const configContext = {
       locale,
       widgets: { ...defaultWidgets, ...widgets },
@@ -56,8 +68,8 @@ export default function withProvider<T>(Element: React.ComponentType<T>, default
       globalProps,
       globalConfig
     };
-  
-    const langPack: any = { 
+
+    const langPack: any = {
       ...antdLocale,
       'FormRender': locales[locale],
       ...configProvider?.locale

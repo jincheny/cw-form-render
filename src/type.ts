@@ -369,9 +369,9 @@ export interface FRProps extends Omit<AntdFormProps, 'form'> {
    */
   debugCss?: boolean;
   /**
-   * 展示语言，目前只支持中文、英文
+   * 展示语言，支持中文简体、中文繁体、英文、日文
    */
-  locale?: 'zh-CN' | 'en-US';
+  locale?: 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP';
   /**
    * 一行展示的列数
    */
