@@ -1,5 +1,7 @@
 # 更新日志
 
+> 本项目基于 [form-render](https://www.npmjs.com/package/form-render) **v2.5.6** 二次开发
+
 ### 1.0.2 (2025-11-05)
 
 #### ✨ 新增功能

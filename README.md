@@ -2,7 +2,7 @@
 
 <div align="center">
   <h3>基于 JSON Schema 的动态表单解决方案</h3>
-  <p>基于 form-render 二次开发，通过 JSON Schema 生成标准 Form，常用于自定义搭建配置界面</p>
+  <p>基于 form-render v2.5.6 二次开发，通过 JSON Schema 生成标准 Form，常用于自定义搭建配置界面</p>
 </div>
 
 ## ✨ 特性
